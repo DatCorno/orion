@@ -474,7 +474,7 @@ class TestFidelity(object):
         assert dim.shape is None
 
     def test_interval(self):
-        """Check that error is being raised."""
+        """Check that None is being returned."""
         dim = Fidelity('epoch')
         with pytest.raises(NotImplementedError):
             dim.interval()
@@ -533,29 +533,36 @@ class TestSpace(object):
         space.register(dim2)
         dim3 = Real('yolo3', 'norm', 0.9)
         space.register(dim3)
+        dim4 = Fidelity('epoch')
+        space.register(dim4)
 
         point = space.sample(seed=seed)
         test_point = [(dim1.sample()[0],
                        dim2.sample()[0],
-                       dim3.sample()[0]), ]
+                       dim3.sample()[0],
+                       dim4.sample()[0]), ]
+
         assert len(point) == len(test_point) == 1
-        assert len(point[0]) == len(test_point[0]) == 3
+        assert len(point[0]) == len(test_point[0]) == 4
         assert np.all(point[0][0] == test_point[0][0])
         assert point[0][1] == test_point[0][1]
         assert point[0][2] == test_point[0][2]
+        assert point[0][3] == test_point[0][3]
 
         points = space.sample(2, seed=seed)
         points1 = dim1.sample(2)
         points2 = dim2.sample(2)
         points3 = dim3.sample(2)
-        test_points = [(points1[0], points2[0], points3[0]),
-                       (points1[1], points2[1], points3[1])]
+        points4 = dim4.sample(2)
+        test_points = [(points1[0], points2[0], points3[0], points4[0]),
+                       (points1[1], points2[1], points3[1], points4[0])]
         assert len(points) == len(test_points) == 2
         for i in range(2):
-            assert len(points[i]) == len(test_points[i]) == 3
+            assert len(points[i]) == len(test_points[i]) == 4
             assert np.all(points[i][0] == test_points[i][0])
             assert points[i][1] == test_points[i][1]
             assert points[i][2] == test_points[i][2]
+            assert points[i][3] == test_points[i][3]
 
     def test_interval(self):
         """Check whether interval is cool."""
@@ -568,8 +575,10 @@ class TestSpace(object):
         space.register(dim)
         dim = Real('yolo3', 'norm', 0.9)
         space.register(dim)
+        dim = Fidelity('epoch')
+        space.register(dim)
 
-        assert space.interval() == [categories, (-3, 3), (-np.inf, np.inf)]
+        assert space.interval() == [categories, (-3, 3), (-np.inf, np.inf), 'fidelity']
 
     def test_bad_setitem(self):
         """Check exceptions in setting items in Space."""

@@ -661,10 +661,9 @@ class Fidelity(Dimension):
 
     def sample(self, n_samples=1, seed=None):
         """Do not do anything."""
-        pass
+        return ['fidelity'] * n_samples
 
     def interval(self, alpha=1.0):
-        """Do not do anything."""
         raise NotImplementedError
 
     def cast(self, point=0):
@@ -729,6 +728,8 @@ class Space(OrderedDict):
         for dim in self.values():
             if dim.type == 'categorical':
                 res.append(dim.categories)
+            elif dim.type == 'fidelity':
+                res.append('fidelity')
             else:
                 res.append(dim.interval(alpha))
         return res
