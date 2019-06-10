@@ -59,28 +59,31 @@ class ASHA(BaseAlgorithm):
         .. note:: New parameters must be compliant with the problem's domain
            `orion.algo.space.Space`.
         """
+        if num > 1:
+            raise ValueError("ASHA should suggest only one point.")
 
         for bracket in self.brackets:
             candidate = bracket.update_rungs()
             if candidate:
                 return candidate
 
-        point = self.space.sample(num, seed=self.rng.randint(0, 10000))
+        point = list(self.space.sample(num, seed=self.rng.randint(0, 10000))[0])
 
         sizes = numpy.array([len(b.rungs) for b in self.brackets])
         probs = numpy.e**(sizes - sizes.max())
         normalized = probs / probs.sum()
         idx = numpy.random.choice(len(self.brackets), p=normalized)
 
-        point[self.fidelity_index] = self.brackets[idx].rungs[-1][0]
+        point[self.fidelity_index] = self.brackets[idx].rungs[0][0]
         self.trial_info[self._get_id(point)] = self.brackets[idx]
         # NOTE: The point is not registered in bracket here, until in `observe()`
 
-        return point
+        return tuple(point)
 
     def _get_id(self, point):
-        non_fidelity_dims = point[0:self.fidelity_index]
-        non_fidelity_dims.extend(point[self.fidelity_index + 1:])
+        _point = list(point)
+        non_fidelity_dims = _point[0:self.fidelity_index]
+        non_fidelity_dims.extend(_point[self.fidelity_index + 1:])
 
         return hashlib.md5(str(non_fidelity_dims).encode('utf-8')).hexdigest()
 
@@ -172,7 +175,7 @@ class _Bracket():
             Lookup for promotion in rung l + 1 contains trials of any status.
         """
         # NOTE: There should be base + 1 rungs
-        for rung_id in range(len(self.rungs) - 2, 0, -1):
+        for rung_id in range(len(self.rungs) - 2, -1, -1):
             objective, candidate = self.get_candidate(rung_id)
             if candidate:
                 candidate = copy.deepcopy(candidate)
