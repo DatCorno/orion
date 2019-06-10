@@ -5,7 +5,9 @@
 import hashlib
 import numpy as np
 import pytest
+import unittest.mock as mock
 
+import orion
 from orion.algo.asha import ASHA, _Bracket
 from orion.algo.space import Real, Fidelity, Space
 
@@ -175,3 +177,90 @@ class TestBracket():
         candidate = bracket.update_rungs()
 
         assert candidate is None
+
+
+class TestAsha():
+    """Tests for the `ASHA` class."""
+
+    def test_construction(self, space):
+        """Test the construction of a valid ASHA object."""
+        asha = ASHA(space, None, 100, 1, 2, 1)
+
+        assert asha.seed is None
+        assert asha.max_resources == 100
+        assert asha.grace_period == 1
+        assert asha.reduction_factor == 2
+        assert len(asha.brackets) == 1
+        assert asha.trial_info == {}
+        assert len(asha.space) == 2
+
+    def test_bad_reduction_factor(self, space):
+        """Test that a non-valid reduction factor raises an error."""
+        with pytest.raises(AttributeError) as ex:
+            ASHA(space, reduction_factor=1)
+
+        assert "Reduction" in str(ex)
+
+    def test_fidelity_index(self, space):
+        """Test that the `fidelity_index` property returns the correct value."""
+        asha = ASHA(space)
+        assert asha.fidelity_index == 1
+
+    def test_get_id(self, space):
+        """Test that the `_get_id` helper works properly."""
+        space.register(Real("mom", 'uniform', 0, 1))
+        asha = ASHA(space)
+        point_hash = hashlib.md5(str([0.0, 0.1]).encode('utf-8')).hexdigest()
+        point = [0.0, 1, 0.1]
+
+        assert point_hash == asha._get_id(point)
+
+    def test_suggest_new_point(self, space):
+        """Test that new point is created and assigned to the right bracket."""
+        asha = ASHA(space, None, 9, 1, 3)
+        space_sample = [(0.5, 'fidelity')]
+        point_hash = hashlib.md5(str([0.5]).encode('utf-8')).hexdigest()
+
+        with mock.patch.object(orion.algo.space.Space, "sample", return_value=space_sample):
+            point = asha.suggest()
+            assert asha._get_id(list(point)) == point_hash
+            assert point[0] == 0.5
+            assert point[1] == 1
+            assert not len(asha.brackets[0].rungs[0][1])
+            assert len(asha.trial_info)
+            assert asha.trial_info[point_hash]
+
+    def test_suggest_multiple_points(self, space):
+        """Test that ASHA only samples one point."""
+        asha = ASHA(space, None, 9, 1, 3)
+        with pytest.raises(ValueError) as ex:
+            asha.suggest(num=2)
+
+        assert "only" in str(ex)
+
+    def test_suggest_candidate(self, space, bracket, rung_0):
+        """Test that the candidate point is use."""
+        asha = ASHA(space, None, 9, 1, 3)
+        bracket.asha = asha
+        bracket.rungs[0] = rung_0
+        asha.brackets[0] = bracket
+        point_hash = hashlib.md5(str([0.0]).encode('utf-8')).hexdigest()
+
+        point = asha.suggest()
+
+        assert asha._get_id(list(point)) == point_hash
+        assert point[0] == 0.0
+        assert point[1] == 3
+
+    def test_already_observed(self, space):
+        """Test that already observed points are registered to proper bracket."""
+        asha = ASHA(space)
+        space_sample = [(0.5, 'fidelity')]
+
+        with mock.patch.object(orion.algo.space.Space, "sample", return_value=space_sample):
+            point = list(asha.suggest())
+            asha.observe([point], [0.5])
+
+            assert len(asha.brackets[0].rungs[0][1])
+
+
